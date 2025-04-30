@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Калькулятор Себестоимости USDT</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 20px;
+      background: #0e0e0e;
+      color: #e0e0e0;
+      font-family: 'Montserrat', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 30px;
+    }
+    .container {
+      width: 100%;
+      max-width: 600px;
+      background: #1a1a1a;
+      padding: 40px 30px;
+      border-radius: 10px;
+      box-shadow: 0 0 12px rgba(0,0,0,0.5);
+    }
+    h1 {
+      text-align: center;
+      font-size: 28px;
+      margin-bottom: 25px;
+      margin-top: 0;
+      color: #2e7d32;
+      font-weight: 700;
+    }
+    label {
+      font-weight: 600;
+      margin-bottom: 6px;
+      display: block;
+      font-size: 16px;
+      color: #cccccc;
+    }
+    input[type="text"], input[type="number"] {
+      width: 100%;
+      padding: 12px 14px;
+      font-size: 17px;
+      margin-bottom: 20px;
+      border: 1px solid #333;
+      border-radius: 8px;
+      background: #121212;
+      color: #e0e0e0;
+    }
+    .result {
+      margin-top: 20px;
+      font-size: 20px;
+      font-weight: 600;
+      text-align: center;
+      opacity: 0;
+      transition: opacity 0.4s ease-in-out;
+    }
+    .result.show {
+      opacity: 1;
+    }
+    .positive {
+      color: #4caf50;
+    }
+    .negative {
+      color: #ef5350;
+    }
+    .small {
+      font-size: 13px;
+      color: #777;
+      text-align: center;
+      margin-top: 10px;
+    }
+    .price {
+      margin-bottom: 20px;
+      font-size: 20px;
+      font-weight: 600;
+      text-align: center;
+      color: #81c784;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Блок BTC -->
+  <div class="container">
+    <h1>BTC ➔ USDT</h1>
+    <div id="price-btc" class="price">Курс BTC/USDT: загружается...</div>
+
+    <label for="btcRubInput">Цена покупки BTC в рублях (P2P)</label>
+    <input type="text" id="btcRubInput" placeholder="Например, 5 800 000" oninput="onInputChange('btc')" />
+
+    <label for="btcSellInput">Цена продажи USDT</label>
+    <input type="number" id="btcSellInput" value="85.5" step="0.01" oninput="onInputChange('btc')" />
+
+    <div class="result" id="costResult-btc">Себестоимость 1 USDT: —</div>
+    <div class="result" id="marginResult-btc">Маржа: —</div>
+
+    <div class="small">Курс обновляется каждые 5 секунд</div>
+  </div>
+
+  <!-- Блок ETH -->
+  <div class="container">
+    <h1>ETH ➔ USDT</h1>
+    <div id="price-eth" class="price">Курс ETH/USDT: загружается...</div>
+
+    <label for="ethRubInput">Цена покупки ETH в рублях (P2P)</label>
+    <input type="text" id="ethRubInput" placeholder="Например, 360 000" oninput="onInputChange('eth')" />
+
+    <label for="ethSellInput">Цена продажи USDT</label>
+    <input type="number" id="ethSellInput" value="85.5" step="0.01" oninput="onInputChange('eth')" />
+
+    <div class="result" id="costResult-eth">Себестоимость 1 USDT: —</div>
+    <div class="result" id="marginResult-eth">Маржа: —</div>
+
+    <div class="small">Курс обновляется каждые 5 секунд</div>
+  </div>
+
+  <script>
+    let currentPriceBTC = 0;
+    let currentPriceETH = 0;
+
+    async function fetchPrice(symbol, priceId) {
+      try {
+        const response = await fetch(`https://api-aws.huobi.pro/market/detail/merged?symbol=${symbol}`);
+        const data = await response.json();
+        const currentPrice = data.tick.close;
+
+        document.getElementById(priceId).innerText = `Курс ${symbol.toUpperCase().replace('USDT','')}/USDT: ${currentPrice.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`;
+
+        if (symbol === 'btcusdt') {
+          currentPriceBTC = currentPrice;
+        } else {
+          currentPriceETH = currentPrice;
+        }
+
+        onInputChange(symbol.includes('btc') ? 'btc' : 'eth');
+      } catch (e) {
+        document.getElementById(priceId).innerText = `Ошибка загрузки курса ${symbol.toUpperCase().replace('USDT','')}/USDT`;
+      }
+    }
+
+    function formatNumberInput(input) {
+      let value = input.value.replace(/\D/g, '');
+      if (value) {
+        input.value = Number(value).toLocaleString('ru-RU');
+      } else {
+        input.value = '';
+      }
+    }
+
+    function parseFormattedNumber(str) {
+      return Number(str.replace(/\s/g, ''));
+    }
+
+    function onInputChange(type) {
+      const rubInput = document.getElementById(type + 'RubInput');
+      const sellInput = document.getElementById(type + 'SellInput');
+
+      formatNumberInput(rubInput);
+
+      const rubPrice = parseFormattedNumber(rubInput.value);
+      const sellPrice = parseFloat(sellInput.value) || 0;
+
+      const costResult = document.getElementById('costResult-' + type);
+      const marginResult = document.getElementById('marginResult-' + type);
+
+      const currentPrice = (type === 'btc') ? currentPriceBTC : currentPriceETH;
+
+      if (!rubPrice || currentPrice === 0) {
+        costResult.classList.remove('show');
+        marginResult.classList.remove('show');
+        return;
+      }
+
+      const usdtCost = rubPrice / currentPrice;
+      const margin = sellPrice - usdtCost;
+      const marginPercent = (margin / usdtCost) * 100;
+
+      costResult.innerText = `Себестоимость 1 USDT: ${usdtCost.toFixed(2)} руб`;
+      marginResult.innerText = `Маржа: ${margin.toFixed(2)} руб (${marginPercent.toFixed(2)}%)`;
+
+      costResult.classList.add('show');
+      marginResult.classList.add('show');
+
+      marginResult.classList.remove('positive', 'negative');
+      if (margin > 0) {
+        marginResult.classList.add('positive');
+      } else {
+        marginResult.classList.add('negative');
+      }
+    }
+
+    fetchPrice('btcusdt', 'price-btc');
+    fetchPrice('ethusdt', 'price-eth');
+
+    setInterval(() => {
+      fetchPrice('btcusdt', 'price-btc');
+      fetchPrice('ethusdt', 'price-eth');
+    }, 5000);
+  </script>
+
+</body>
+</html>
